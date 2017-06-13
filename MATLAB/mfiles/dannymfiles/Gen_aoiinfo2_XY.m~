@@ -1,0 +1,16 @@
+function aoiinfo2=Gen_aoiinfo2_XY(coord)
+
+%Gen_aoiinfo2_XY(coord) takes the outputted coordinate structure containing
+%X and Y centers from spot picking and generates a aoiinfo2 structure that
+%can be recognized by imscroll.  aoiinfo2 format is [(framenumber when marked) ave x y pixnum aoinumber]
+
+%Create a blank aoiinfo2 vector
+aoiinfo2=[];
+
+% generate one row at a time of aoiinfo2 such that:
+% [(framenumber when marked) ave x y pixnum aoinumber] is 
+% [1 1 x y 5 aoinum]
+for aoinum=1:(length(coord(:,1)));
+AoiRow=[1 1 coord(aoinum,1) coord(aoinum,2) 5 aoinum];
+aoiinfo2=[aoiinfo2;AoiRow];
+end

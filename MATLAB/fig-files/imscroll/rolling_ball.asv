@@ -1,0 +1,31 @@
+function [ background ] = rolling_ball(image,R,H)
+%rolling_ball(image, R, H) takes a single image and calculates a rolling
+%ball background, with the necessary inputs as the image matrix, the radius
+%and the height of the ball.  (Default R=15, H=5).
+%   Prior to the morphological opening using a rolling ball, there is a
+%   conservative disk averaging filter of 2-pixel radius to smooth the
+%   background.  Presumably, any non-background objects biased by the
+%   averaging filter are removed by the morphological opening.
+
+% the first process is a small disk background averaging filter, to smooth the
+% baseline noise
+h=fspecial('disk',2);
+I0=imfilter(image,h,'symmetric','same');
+
+%setup default R and H values
+if (nargin < 3) || isempty(H)
+  H = 5;
+end
+if (nargin < 3) || isempty(R)
+  R = 15;
+end
+% the structural element of type ball takes the inputs of 'r' and 'h'.
+se=strel('ball', R, H);
+
+% now morphologically open the averaged image, using the structural element
+% se
+
+background=imopen(I0, se);
+
+end
+

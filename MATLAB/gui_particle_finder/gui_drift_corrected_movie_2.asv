@@ -1,0 +1,885 @@
+function varargout = gui_drift_corrected_movie_2(varargin)
+% GUI_DRIFT_CORRECTED_MOVIE_2 Creates a drift corrected movie in stacked
+% tiff or avi format.
+% This program allows you to make drift corrected movies by manually selecting
+%reference points, using cross correlation drift correction or loading a drift correction file.
+%You may also make an avi or stacked tiff movie from a glimpse file.
+%
+%DRIFT CORRECTION OPTIONS:
+%This panel consists of a radio button selection between manual drift
+%correction (reference point selection process), cross correlation drift
+%correction, loading a drift correction file and not using drift correction
+%at all. In any case the output will be a stacked TIFF or AVI file.
+%
+%Manual drift correction uses a process of selecting reference points and
+%averaging overlaps in their movements to calculate drift correction. Gaps
+%between reference points are averaged as well, and gaps at the beginning
+%or end of the frame range are ignored completely. The frame range is then
+%adjusted accordingly.
+%
+%Cross correlation drift correction is a fully automated process that
+%implements Larry's cross correlation program to calculate drift correction.
+%
+%Loading a drift correction file requires that you use a frame range
+%equivalent to the one used in the file it was created in, though the file
+%will self adjust if problems are found. If the frame range is too long or
+%too short the program will terminate.
+%
+%MANUAL DRIFT CORRECTION PARAMETERS:
+% bpass(x,y): 
+% 	X: Characteristic lengthscale of noise in pixels. Additive noise averaged over this length should vanish. 			
+%        May assume any positive floating value. , 
+% 	Y: A length in pixels somewhat larger than a typical object. Must be an odd valued integer.)
+% 
+% pkfind(x,y):
+% 	X: The minimum brightness of a pixel that might be local maxima. (NOTE: Make it big and the code runs faster 			
+%         but you might miss some particles.  Make it small and you'll get everything and it'll be slow.)
+% 	Y: OPTIONAL if your data's noisy, (e.g. a single particle has multiple local maxima), then set this optional 			
+%         keyword to a value slightly larger than the diameter of your blob.  if multiple peaks are found 			
+%         within a radius of sz/2 then the code will keep only the brightest.  Also gets rid of all 				
+%         peaks within sz of boundary
+% 
+% maxdisp(x):
+% 	X: An estimate of the maximum distance that a particle would move in a single time interval.
+% 	      maxdisp should be set to a value somewhat less than the mean spacing between the particles. As maxdisp 				
+%         approaches the mean spacing the runtime will increase significantly. The function will produce an 			
+%         error message: "Excessive Combinatorics!" if the run time would be too long, and the user should 			
+%         respond by re-executing the function with a smaller value of maxdisp. Obviously, if the particles 			
+%         being tracked are frequently moving as much as their mean separation in a single time step, this 			
+%         function will not return acceptable trajectories.
+%
+%GENERAL PARAMETERS:
+%   Start Frame: The starting frame of the sequence you would like to analyze.
+%   End Frame: The starting frame of the sequence you would like to analyze.
+%         Start and End frames are self correcting, if you enter values that are too high they will automatically adjust.
+%         If manual drift correction is used and the entire frame range is not covered the start and end frames will adjust
+%         to fit the covered range.
+%   Display Scale: The scale used for each image. the default is usually
+%         sufficient for most files.
+%   File path: The path to the glimpse folder of the file you want to analyze.
+%   Output Path: The directory the movie will be placed in.
+%   Select Area: If you want to make a movie of a certain region instead of the full frame you may use this option to drag 
+%         a box on the frame to select a specific area. A sample frame will be loaded from the selected file to make this process
+%         easier. The selected area coordinates will be displayed in the Area (x1 x2 y1 y2) box
+%         of the Cross Correlation parameters.
+%DISPLAY:
+%This panel will show useful information about the file analysis process
+%such as percent of the frame range covered by manual drift correction.
+%OUTPUT FILE TYPE:
+%You select between and AVI and a stacked TIFF file output. If AVI is
+%selected you also have the option of specifying frames per second. The
+%default value is 15 frames per second.
+%CROSS CORRELATION PARAMETERS:
+%Select are to analyze: This feature allows you to select a more accurate
+%area for cross correation drift correction. It loads a sample frame from 
+%the file being analyzed for ease of use. The larger the area the longer
+%it will take, and it isn't necessarily more accurate. It is recommended
+%that this setting is left alone unless you know what you are doing.
+%   Area (x1 x2 y1 y2): A manual version of the select area feature. It is
+%         updated with each selection made if select area and also displays the
+%         area of interest used in general parameters.
+%   Average Frames: the variable 'averange' from Larry's drifting_7.m program.
+%         averange == e.g. 5 or 10   the sequence will be broken into sequential 
+%         frame groups of this size, and each group will be frame 
+%         averaged before computing the cross correlation with the next
+%         frame group.
+%   Fit Width: the variable 'fitwidth' from Larry's drifting_7.m program.
+%         fitwidth == the central peak of the cross correlation will be fit with a
+%         gaussian function.  The full width of the region that will be 
+%         fit is given by the fitwidth parameter.
+
+
+%Version 2.0, This uses the updated manual point selection process.
+
+
+
+
+
+
+
+
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @gui_drift_corrected_movie_2_OpeningFcn, ...
+                   'gui_OutputFcn',  @gui_drift_corrected_movie_2_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before gui_drift_corrected_movie_2 is made visible.
+function gui_drift_corrected_movie_2_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to gui_drift_corrected_movie_2 (see VARARGIN)
+
+% Choose default command line output for gui_drift_corrected_movie_2
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+
+% UIWAIT makes gui_drift_corrected_movie_2 wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = gui_drift_corrected_movie_2_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+% --- Executes on button press in process.
+function process_Callback(hObject, eventdata, handles)
+    selected_area=handles.SelectedArea;
+    if isempty(selected_area)
+        selected_area=[1 512 1 300];
+    end
+    axes(handles.axes_ave);
+    frm_start=str2double(get(handles.start_frame,'string'));
+    frm_stop=str2double(get(handles.end_frame,'string'));
+    fpath=get(handles.file_path,'string');
+    out_path=get(handles.out_path,'string');
+    disp_scale=str2num(get(handles.disp_scale,'string'));
+    if isempty(fpath)
+       set(handles.process,'string','Select File Path');
+       return;
+    end
+    if isempty(out_path)
+       set(handles.process,'string','Select Output Path');
+       return;
+    end
+    set(handles.process,'string','Processing...');
+    load([fpath '\header.mat']);
+    max_frame=vid.nframes;
+    if frm_stop > max_frame
+        warning(['this file only has ' num2str(max_frame) ' frames!'])
+        frm_stop=max_frame;
+    end
+    if frm_start > max_frame
+        warning(['this file only has ' num2str(max_frame) ' frames!'])
+        frm_start=1;
+    end
+    man_corr=get(handles.manual_corr,'value');
+    cross_corr=get(handles.cross_corr,'value');
+    load_corr=get(handles.load_corr,'value');
+    if man_corr ==1
+        frange=[num2str(frm_start) ' : ' num2str(frm_stop)];
+        frange=str2num(frange);
+        pk_master=[];
+        glimpse_ave=[];
+        counter=0;
+        % Manual Drift Correction
+        load([fpath 'header.mat']);
+        imfnum=vid.nframes;
+        time=(vid.ttb-vid.ttb(1))/1000; %s
+        bpass_inputs=str2num(get(handles.bpass,'string'));
+        pkfnd_inputs=str2num(get(handles.pk_find,'string'));
+        for findx=frange
+            wawa=read_image('glimpse',fpath,findx,'');
+            [m,n] = size(glimpse_ave);
+            if m<3
+                glimpse_ave=wawa;
+            else
+                glimpse_ave=glimpse_ave+wawa;
+            end
+            dum=wawa;
+            dat=bpass(dum,bpass_inputs(1),bpass_inputs(2));
+            pk=pkfnd(dat,pkfnd_inputs(1),pkfnd_inputs(2));
+            pk=cntrd(dat,pk,15); %centroid refinement
+            if isempty(pk)
+                pk=[0 0 time(findx)];
+            else
+                pk=pk(:,1:2);
+                pk(:,3)=time(findx);
+            end
+            pk_master=[pk_master;pk];
+            counter=counter+1;
+        end
+        glimpse_ave=glimpse_ave/counter;
+        %tracking--------------------------------------------------------
+        param.mem=2;    %has to be in consecutive frames to be considered in the same trajectory
+        param.good=4;   %didn't use because I don't know what "param.good" does
+        param.dim=3;    %x y t (3D)
+        param.quiet=1;  %no text
+        maxdisp=str2double(get(handles.max_disp,'string'));
+        trajectory=track(pk_master,maxdisp,param);
+        if isempty(trajectory)
+            warning('no trajectories to analyze!')
+            return;
+        end
+        %----------------------------------------------------------------
+        %graph image #####################################
+        cla;
+        axis image;
+        colormap(gray);
+        imagesc(glimpse_ave,disp_scale);
+        axis image;
+        title('Choose brightest reference points');
+        xlabel('x position (pixels)');
+        ylabel('y position (pixels)');
+        peaks.long=pk_master;
+        tracks.long=trajectory;
+        time_to_frames=unique([unique(pk_master(:,3),'rows') (frm_start:frm_stop)'],'rows');
+        %time_to_frames(:,1)
+        %average movement between skipped frames
+        traj_ids=sort(unique(trajectory(:,4), 'rows'),1);
+        [r,s]=size(traj_ids);
+        next_likely_id=0;
+        trajectory_ave=[];
+        for i=1:r
+            findx=find(trajectory(:,4)==traj_ids(i));
+            trajectory_selected=trajectory(findx,:);
+            [a,b]= size(trajectory_selected);
+            findframes=[];
+            for i=1:a
+                findframes=[findframes;time_to_frames(find(time_to_frames(:,1)==trajectory_selected(i,3)),2)];
+            end
+            trajectory_selected_ave=[];
+            for i=1:1:a-1
+                findi=findframes(i);
+                findi2=findframes(i+1);
+                trajectory_selected_ave=[trajectory_selected_ave;trajectory_selected(i,:) findi];
+                if findi2-findi > 1
+                    diff=findi2-findi;
+                    ave1=(trajectory_selected(i+1,1)-trajectory_selected(i,1))/diff;
+                    ave2=(trajectory_selected(i+1,2)-trajectory_selected(i,2))/diff;
+                    ave3=(trajectory_selected(i+1,3)-trajectory_selected(i,3))/diff;
+                    ave4=(trajectory_selected(i+1,4)-trajectory_selected(i,4))/diff;
+                    for j=1:diff-1
+                        nextframe=findi+(((findi2-findi)/diff)*j);
+                        nextpoint=[trajectory_selected(i,1)+ave1*j trajectory_selected(i,2)+ave2*j time_to_frames(nextframe-frm_start+1,1) trajectory_selected(i,4)+ave4*j nextframe]; 
+                        trajectory_selected_ave=[trajectory_selected_ave;nextpoint];
+                    end
+                end
+                trajectory_selected_ave=[trajectory_selected_ave;trajectory_selected(i+1,:) findi2];
+            end
+            trajectory_selected=sortrows(unique(trajectory_selected_ave,'rows'),5);
+            trajectory_ave=[trajectory_ave;trajectory_selected];
+        end
+        trajectory=trajectory_ave(:,1:4);
+        %end averaging movement between skipped frames
+        %select reference points
+        drift_corr=[];
+        drift_time_span=[];
+        drift_dist_ave=[];
+        drift_traj_ave=[];
+        c=[];
+        c(1:length(trajectory),1)=0;
+        traj_times_all=unique([trajectory(:,3) c],'rows');
+        selected_trajs=[];
+        while true % until LMB or enter is pressed
+            [xin yin button]=ginput(1);    %first select the trajectory of interest
+            if(button==3)
+                break;
+            end
+            %axes(handles.axes_image);
+            selected=[xin yin];
+            if isempty(selected)
+                break;
+                %end loop 
+            end
+            %drift_corr
+            rv = func_return_nearest_TOIs2(trajectory, selected,'');
+            drift_corr=[drift_corr;rv;rv];
+            id_indx=rv(3);
+            findx=find(trajectory(:,4)==id_indx);
+            trajectory_selected=trajectory(findx,:);
+            drift_time_span=[drift_time_span;trajectory_selected(:,3)];
+            drift_time_span=unique(drift_time_span, 'rows');
+            %drift_time_span
+            [a,b]= size(drift_time_span);
+            covered=(a/(frange(end)-frange(1)+1)*100);
+
+            %print drift time span/frame range?
+            toprint=[num2str(covered) '% covered'];
+            set(handles.disp1,'string',toprint);
+            toprint=['Covered frames ' num2str(time_to_frames(find(time_to_frames(:,1)==drift_time_span(1,1)),2)) ' to ' num2str(time_to_frames(find(time_to_frames(:,1)==drift_time_span(end,1)),2))];
+            set(handles.disp2,'string',toprint);
+            %num_selected=num_selected+1;
+            if isempty(drift_traj_ave)
+                drift_traj_ave=[trajectory_selected(:,1)-trajectory_selected(1,1) trajectory_selected(:,2)-trajectory_selected(1,2) trajectory_selected(:,3)];
+                selected_trajs=unique([selected_trajs;id_indx],'rows');
+                %add one to counter, later divide each time by
+                %counter
+                for j=1:length(drift_traj_ave)
+                    time_to_add=find(traj_times_all(:,1)==drift_traj_ave(j,3));
+                    traj_times_all(time_to_add,2)=traj_times_all(time_to_add,2)+1;
+                end
+            else
+                %set up traj time matrix that counts the number of times a time
+                %has been added to average it by that number later
+                traj_times=trajectory_selected(:,3);
+                [r,c]=size(traj_times);
+                for i=1:r
+                    findave1=find(drift_traj_ave(:,3)==traj_times(i,1));
+                    if isempty(findave1) %drift ave doesnt contain this line of the selected traj
+                        drift_traj_ave=[drift_traj_ave;trajectory_selected(i,1)-trajectory_selected(1,1) trajectory_selected(i,2)-trajectory_selected(1,2) trajectory_selected(i,3)];
+                        %add one to counter, later divide each time by
+                        %counter
+                        selected_trajs=unique([selected_trajs;id_indx],'rows');
+                        findave2=find(drift_traj_ave(:,3)==traj_times(i,1));
+                        time_to_add=find(traj_times_all(:,1)==drift_traj_ave(findave2,3));
+                        traj_times_all(time_to_add,2)=traj_times_all(time_to_add,2)+1;
+                    else
+                        findave=drift_traj_ave(findave1,:);
+                        findsel=find(trajectory_selected(:,3)==traj_times(i,1));
+                        if isempty(findsel)
+                            findsel=[trajectory_selected(1,1) trajectory_selected(1,2)];
+                        else
+                            findsel=trajectory_selected(findsel,:);
+                        end
+                        drift_traj_ave(findave1,:)=unique([findave(1,1)+findsel(1,1)-trajectory_selected(1,1) findave(1,2)+findsel(1,2)-trajectory_selected(1,2) drift_traj_ave(findave1,3)],'rows');
+                        %make sure that trajectories are unique before
+                        %adding
+                        %to counter
+                        if isempty(selected_trajs)
+                            %add one to counter, later divide each time by
+                            %counter
+                            time_to_add=find(traj_times_all(:,1)==drift_traj_ave(findave1,3));
+                            traj_times_all(time_to_add,2)=traj_times_all(time_to_add,2)+1;
+                        else
+                            if isempty(find(selected_trajs(:,1)==id_indx, 1))
+                                %add one to counter, later divide each time by
+                                %counter
+                                time_to_add=find(traj_times_all(:,1)==drift_traj_ave(findave1,3));
+                                traj_times_all(time_to_add,2)=traj_times_all(time_to_add,2)+1;
+                            end
+                        end
+                    end
+                end
+                selected_trajs=unique([selected_trajs;id_indx],'rows');
+            end
+        end
+        %check for no selected points
+        if isempty(drift_traj_ave)
+           'no points selected!'
+           return; 
+        end
+        %divide each displacement(by time) by the number of trajectories that were selected that
+        %exist during this time
+        counter1=1;
+        for j=1:length(traj_times_all)
+            if traj_times_all(j,2)~=0
+                drift_traj_ave(counter1,:)=[drift_traj_ave(counter1,1)/traj_times_all(j,2) drift_traj_ave(counter1,2)/traj_times_all(j,2) drift_traj_ave(counter1,3)];
+                counter1=counter1+1;
+            end
+        end
+        drift_traj_ave=sortrows(unique(drift_traj_ave,'rows'),3);
+        %will interpolate drift_traj so it makes better movies (less jumpy)
+        drift_traj_ave_temp=drift_traj_ave;
+        %convert all times to frames, replace in drift corr
+        %interpolation function, averages drift between frame gaps
+        gap_counter=1;
+        finder=find(time_to_frames(:,1)==drift_traj_ave_temp(1,3));
+        drift_traj_ave_temp(1,3)=time_to_frames(finder,2);
+        drift_correction=drift_traj_ave_temp(1,:);
+        for i=2:length(drift_traj_ave_temp)
+           finder=find(time_to_frames(:,1)==drift_traj_ave_temp(i,3));
+           frame=time_to_frames(finder,2);
+           drift_traj_ave_temp(i,3)=frame;
+           gap_counter=drift_traj_ave_temp(i,3)-drift_traj_ave_temp(i-1,3);
+           if gap_counter>1
+               x_drift=(drift_traj_ave_temp(i,1)-drift_traj_ave_temp(i-1,1))/gap_counter;
+               y_drift=(drift_traj_ave_temp(i,2)-drift_traj_ave_temp(i-1,2))/gap_counter;
+               frames=(drift_traj_ave_temp(i,3)-drift_traj_ave_temp(i-1,3))/gap_counter;
+               for j=1:gap_counter
+                   drift_correction=[drift_correction;[drift_traj_ave_temp(i-1,1)+x_drift*j drift_traj_ave_temp(i-1,2)+y_drift*j drift_traj_ave_temp(i-1,3)+frames*j]];
+               end
+           else
+               drift_correction=[drift_correction;drift_traj_ave_temp(i,:)];
+           end
+        end
+        for i=2:length(drift_correction)-1
+            if abs(drift_correction(i,1))+abs(drift_correction(i,2))==0
+                drift_correction(i,1)=(drift_correction(i-1,1)+drift_correction(i+1,1))/2;
+                drift_correction(i,2)=(drift_correction(i-1,2)+drift_correction(i+1,2))/2;
+                drift_correction(i,3)=(drift_correction(i-1,3)+drift_correction(i+1,3))/2;
+            end
+        end
+        %change time info into frames
+        frm_start=time_to_frames(find(time_to_frames(:,1)==min(drift_traj_ave(:,3))),2); 
+        frm_stop=time_to_frames(find(time_to_frames(:,1)==max(drift_traj_ave(:,3))),2);
+        %set start/stop frames to max, min of drift correction supported
+        %data
+        set(handles.start_frame,'string',num2str(frm_start));
+        set(handles.end_frame,'string',num2str(frm_stop));
+    elseif cross_corr==1
+        area_selected=str2num(get(handles.area_selected,'string'));
+        averange=str2num(get(handles.averange,'string'));
+        fitwidth=str2num(get(handles.fitwidth,'string'));
+        drift_corr=[0 0 0 0 0 0 0 0 0 0 0];
+        drift_corr=[drift_corr;drifting_v7(fpath,[frm_start frm_stop],area_selected,averange,fitwidth,1)];
+        [r,c]=size(drift_corr);
+        for i=0:r-1
+            drift_corr(r-i,10)=sum(drift_corr(1:r-i,10));
+            drift_corr(r-i,11)=sum(drift_corr(1:r-i,11));
+        end
+        drift_correction=[drift_corr(:,10) drift_corr(:,11) drift_corr(:,1)];
+    elseif load_corr==1
+        drift_correction=[];
+        [a b]=uigetfile;
+        load([b a]);
+        split_path=regexp(a, '_', 'split');
+        frame_range=regexp(split_path{2}, '-', 'split');
+        if isempty(drift_correction)
+            warning(['Load a supported drift correction file!'])
+        end
+        set(handles.start_frame,'string',frame_range{1});
+        set(handles.end_frame,'string',frame_range{2});
+        frm_start=str2num(frame_range{1});
+        frm_stop=str2num(frame_range{2});
+    else
+        drift_correction=zeros(frm_stop-frm_start+1,3);
+    end
+    %drift_correction(end,1)
+    %drift_correction(end,2)
+    fileType=get(handles.avi_file,'value');
+    if fileType==1
+        split_path=regexp(fpath, '\\', 'split');
+        split_path=[strtrim(cell2mat(split_path(end-1:end))) '_' num2str(frm_start) '-' num2str(frm_stop)];
+        filename=[out_path split_path];
+        aviobj = avifile(filename);
+        aviobj.fps=str2num(get(handles.frames_per_second,'string'));
+        counter=1;
+        for i=frm_start+1:frm_stop
+            f=read_image('glimpse',fpath,i,'');
+            f=f(selected_area(3):selected_area(4),selected_area(1):selected_area(2));
+            disp_x=drift_correction(i-frm_start+1,1);
+            disp_y=drift_correction(i-frm_start+1,2);
+            %[i disp_x disp_y]
+            f=f/5000;
+            deltar = disp_y;
+            deltac = disp_x;
+            phase = 2;
+            [nr,nc]=size(f);
+            Nr = ifftshift([-fix(nr/2):ceil(nr/2)-1]);
+            Nc = ifftshift([-fix(nc/2):ceil(nc/2)-1]);
+            [Nc,Nr] = meshgrid(Nc,Nr);
+            g = ifft2(fft2(f).*exp(sqrt(-1)*2*pi*(deltar*Nr/nr+deltac*Nc/nc))).*exp(-sqrt(-1)*phase);
+            %imshow(abs(g));
+            imshow(abs(g)*5000,disp_scale);
+            frame=getframe;
+            aviobj=addframe(aviobj,frame);
+            counter=counter+1;
+            set(handles.disp1,'string',['Processing frame ' num2str(counter)]);
+            set(handles.disp2,'string','');
+        end
+        aviobj=close(aviobj);
+    else
+        drift_corrected_movie_stacked_tiff(fpath,out_path,frm_start,frm_stop,drift_correction);
+    end
+    set(handles.process,'string','Process');
+    handles.SelectedArea=selected_area;
+    guidata(gcbo,handles);
+ 
+
+
+
+
+
+% hObject    handle to process (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+
+function start_frame_Callback(hObject, eventdata, handles)
+% hObject    handle to start_frame (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of start_frame as text
+%        str2double(get(hObject,'String')) returns contents of start_frame as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function start_frame_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to start_frame (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function end_frame_Callback(hObject, eventdata, handles)
+% hObject    handle to end_frame (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of end_frame as text
+%        str2double(get(hObject,'String')) returns contents of end_frame as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function end_frame_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to end_frame (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function out_path_Callback(hObject, eventdata, handles)
+% hObject    handle to out_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+function out_path_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to out_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+function file_path_Callback(hObject, eventdata, handles)
+% hObject    handle to file_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+function file_path_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to file_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in get_file_path.
+function get_file_path_Callback(hObject, eventdata, handles)
+path = uigetdir;
+path=[path '\'];
+set(handles.file_path,'string',path);
+area_select_check=get(handles.area_select,'value');
+if area_select_check == 0
+    set(handles.area_select,'string','Select Area to Analyze');
+end
+set(handles.process,'string','Process');
+% hObject    handle to get_file_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in get_out_path.
+function get_out_path_Callback(hObject, eventdata, handles)
+path = uigetdir;
+path=[path '\'];
+set(handles.out_path,'string',path);
+set(handles.process,'string','Process');
+% hObject    handle to get_out_path (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+
+function disp_scale_Callback(hObject, eventdata, handles)
+% hObject    handle to disp_scale (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of disp_scale as text
+%        str2double(get(hObject,'String')) returns contents of disp_scale as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function disp_scale_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to disp_scale (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in area_select.
+function area_select_Callback(hObject, eventdata, handles)
+%if a path is set, load the first frame and select area. Otherwise, say
+%'need path to load'
+path=get(handles.file_path,'string');
+pressed=get(handles.area_select,'value');
+set(handles.area_select,'string','Select Area to Analyze'); 
+if ~isempty(path)
+    axes(handles.axes_ave);
+    start_frame=str2double(get(handles.start_frame,'string'));
+    frame=read_image('glimpse',path,start_frame,'');
+    disp_scale=str2num(get(handles.disp_scale,'string'));
+    cla;
+    axis image;
+    colormap(gray);
+    imagesc(frame,disp_scale);
+    selected=func_gbox;
+    selected=[num2str(floor(selected(1))) ' ' num2str(floor(selected(2))) ' ' num2str(floor(selected(3))) ' ' num2str(floor(selected(4)))];
+    set(handles.area_selected,'string',selected);
+    set(handles.area_select,'string','Area Selected');
+    set(handles.area_select,'value',1)
+else
+    set(handles.area_select,'string','Need a path to load sample frame!');
+    set(handles.area_select,'value',0);
+end
+
+% hObject    handle to area_select (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of area_select
+
+
+
+function averange_Callback(hObject, eventdata, handles)
+% hObject    handle to averange (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of averange as text
+%        str2double(get(hObject,'String')) returns contents of averange as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function averange_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to averange (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function fitwidth_Callback(hObject, eventdata, handles)
+% hObject    handle to fitwidth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of fitwidth as text
+%        str2double(get(hObject,'String')) returns contents of fitwidth as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function fitwidth_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to fitwidth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function bpass_Callback(hObject, eventdata, handles)
+% hObject    handle to bpass (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of bpass as text
+%        str2double(get(hObject,'String')) returns contents of bpass as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function bpass_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to bpass (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function pk_find_Callback(hObject, eventdata, handles)
+% hObject    handle to pk_find (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of pk_find as text
+%        str2double(get(hObject,'String')) returns contents of pk_find as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function pk_find_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to pk_find (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function max_disp_Callback(hObject, eventdata, handles)
+% hObject    handle to max_disp (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of max_disp as text
+%        str2double(get(hObject,'String')) returns contents of max_disp as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function max_disp_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to max_disp (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function area_selected_Callback(hObject, eventdata, handles)
+% hObject    handle to area_selected (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of area_selected as text
+%        str2double(get(hObject,'String')) returns contents of area_selected as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function area_selected_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to area_selected (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in load_corr_file.
+function load_corr_file_Callback(hObject, eventdata, handles)
+% hObject    handle to load_corr_file (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in avi_file.
+function avi_file_Callback(hObject, eventdata, handles)
+set(handles.avi_file,'value',1);
+set(handles.stacked_tiff_file,'value',0);
+
+% hObject    handle to avi_file (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of avi_file
+
+
+% --- Executes on button press in stacked_tiff_file.
+function stacked_tiff_file_Callback(hObject, eventdata, handles)
+set(handles.avi_file,'value',0);
+set(handles.stacked_tiff_file,'value',1);
+% hObject    handle to stacked_tiff_file (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stacked_tiff_file
+
+
+% --- Executes on button press in select_area.
+function select_area_Callback(hObject, eventdata, handles)
+selected_area=handles.SelectedArea;
+path=get(handles.file_path,'string');
+pressed=get(handles.select_area,'value');
+set(handles.select_area,'string','Select Area'); 
+if ~isempty(path)
+    axes(handles.axes_ave);
+    start_frame=str2double(get(handles.start_frame,'string'));
+    frame=read_image('glimpse',path,start_frame,'');
+    disp_scale=str2num(get(handles.disp_scale,'string'));
+    cla;
+    axis image;
+    colormap(gray);
+    imagesc(frame,disp_scale);
+    selected=func_gbox;
+    selected_area=floor(selected);
+    selected=[num2str(floor(selected(1))) ' ' num2str(floor(selected(2))) ' ' num2str(floor(selected(3))) ' ' num2str(floor(selected(4)))];
+    set(handles.area_selected,'string',selected);
+    set(handles.select_area,'string','Area Selected');
+    set(handles.select_area,'value',1)
+else
+    set(handles.select_area,'string','Need a path to load sample frame!');
+    set(handles.select_area,'value',0);
+end
+handles.SelectedArea=selected_area;
+guidata(gcbo,handles);
+% hObject    handle to select_area (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+
+function frames_per_second_Callback(hObject, eventdata, handles)
+% hObject    handle to frames_per_second (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of frames_per_second as text
+%        str2double(get(hObject,'String')) returns contents of frames_per_second as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function frames_per_second_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to frames_per_second (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+

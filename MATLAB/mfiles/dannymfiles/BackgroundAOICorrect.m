@@ -1,0 +1,80 @@
+% This script will take two sets of aggregate aoidata.mat FRET datasets and
+% output them in a similar format.
+
+plus=input('Pick the first aoidata.mat file and the number to increase aois by  ');
+
+uiload
+loadaoifretdata;
+
+% rename loaded aoifits
+
+GnAoisBig2=GnAoisBig; GnAoisMed2=GnAoisMed; GnAoisSmall2=GnAoisSmall; 
+RdAoisBig2=RdAoisBig; RdAoisMed2=RdAoisMed; RdAoisSmall2=RdAoisSmall;
+
+
+% change aoi numbers
+
+GnAoisBig2.data(:,1)=(GnAoisBig2.data(:,1)+plus); 
+GnAoisBig2.aoiinfo2(:,6)=(GnAoisBig2.aoiinfo2(:,6)+plus);
+GnAoisSmall2.data(:,1)=(GnAoisSmall2.data(:,1)+plus); 
+GnAoisSmall2.aoiinfo2(:,6)=(GnAoisSmall2.aoiinfo2(:,6)+plus);
+GnAoisMed2.data(:,1)=(GnAoisMed2.data(:,1)+plus); 
+GnAoisMed2.aoiinfo2(:,6)=(GnAoisMed2.aoiinfo2(:,6)+plus);
+RdAoisBig2.data(:,1)=(RdAoisBig2.data(:,1)+plus); 
+RdAoisBig2.aoiinfo2(:,6)=(RdAoisBig2.aoiinfo2(:,6)+plus);
+RdAoisMed2.data(:,1)=(RdAoisMed2.data(:,1)+plus); 
+RdAoisMed2.aoiinfo2(:,6)=(RdAoisMed2.aoiinfo2(:,6)+plus);
+RdAoisSmall2.data(:,1)=(RdAoisSmall2.data(:,1)+plus); 
+RdAoisSmall2.aoiinfo2(:,6)=(RdAoisSmall2.aoiinfo2(:,6)+plus);
+clear plus
+
+% pick second aoidata.mat file
+
+uiload
+loadaoifretdata;
+clear aoidata
+
+% append first dataset to second
+
+GnAoisBig.data=[GnAoisBig.data; GnAoisBig2.data]; 
+GnAoisBig.aoiinfo2=[GnAoisBig.aoiinfo2; GnAoisBig2.aoiinfo2];
+GnAoisMed.data=[GnAoisMed.data; GnAoisMed2.data]; 
+GnAoisMed.aoiinfo2=[GnAoisMed.aoiinfo2; GnAoisMed2.aoiinfo2];
+GnAoisSmall.data=[GnAoisSmall.data; GnAoisSmall2.data]; 
+GnAoisSmall.aoiinfo2=[GnAoisSmall.aoiinfo2; GnAoisSmall2.aoiinfo2];
+RdAoisBig.data=[RdAoisBig.data; RdAoisBig2.data]; 
+RdAoisBig.aoiinfo2=[RdAoisBig.aoiinfo2; RdAoisBig2.aoiinfo2];
+RdAoisMed.data=[RdAoisMed.data; RdAoisMed2.data]; 
+RdAoisMed.aoiinfo2=[RdAoisMed.aoiinfo2; RdAoisMed2.aoiinfo2];
+RdAoisSmall.data=[RdAoisSmall.data; RdAoisSmall2.data]; 
+RdAoisSmall.aoiinfo2=[RdAoisSmall.aoiinfo2; RdAoisSmall2.aoiinfo2];
+
+% input storage directory
+
+direct=input('what directory in data should the new data be put in(put in quotes)?   ');
+
+% Save data back into aoifits format
+
+load FileLocations.dat -mat;
+
+aoifits=GnAoisBig;
+eval(['save ' FileLocations.data direct 'GreenBig.dat aoifits']);
+clear GnAoisBig GnAoisBig2;
+aoifits=GnAoisMed;
+eval(['save ' FileLocations.data direct 'GreenMed.dat aoifits']);
+clear GnAoisMed GnAoisMed2;
+aoifits=GnAoisSmall;
+eval(['save ' FileLocations.data direct 'GreenSmall.dat aoifits']);
+clear GnAoisSmall GnAoisSmall2;
+aoifits=RdAoisBig;
+eval(['save ' FileLocations.data direct 'RedBig.dat aoifits']);
+clear RdAoisBig RdAoisBig2;
+aoifits=RdAoisMed;
+eval(['save ' FileLocations.data direct 'RedMed.dat aoifits']);
+clear RdAoisMed RdAoisMed2;
+aoifits=RdAoisSmall;
+eval(['save ' FileLocations.data direct 'RedSmall.dat aoifits']);
+clear RdAoisSmall RdAoisSmall2;
+clear aoifits;
+clear direct;
+

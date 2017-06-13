@@ -1,0 +1,22 @@
+function pc=draw_aois(aoiinfo2,frame,aoisize,driftlist)
+%
+% function pc=draw_aois(aoiinfo2,frame,aoisize,driftlist)
+%
+% This function will use the list of aois in aoiinfo2, reposition all aois
+% at their location for frame 'frame' (using data in driftlist)and draw at
+% those locations with the box side specified in 'aoisize'
+%
+% aoiinfo2 == array that is saved from imscroll.  The aoiinfo2 matrix is of
+%          the form:
+%   [ (frame #)  (frame average) (x coordinate=column) (ycoordinate=row)...
+%                            (aoi side dimension in pixels)  (aoi number) ]
+% frame == common frame number to be used in positioning all the aois
+% aoisize==  side (in pixels) dimension of the aoi box to be drawn
+% driftlist ==[(frame #) (x shift from last frame) (y shift from last frm)]
+%
+[rose col]=size(aoiinfo2);
+for indx=1:rose
+                        % cycle through for each aoi
+   XYshift=ShiftAOI(indx,frame,aoiinfo2,driftlist);
+   draw_box_v1(aoiinfo(indx,3:4)+XYshift,(pixnum)/2,...
+                              (pixnum)/2,'b');
